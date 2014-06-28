@@ -9,8 +9,6 @@ Start clocking in now
 ---------------------
 Just `cloc in PROJECT` when you begin working on a project, then `cloc out` when you're finished. All of your work periods are stored in an easily-readable log file. Deal with the raw data yourself, or use one of cloc's options for quickly visualizing data or totalling work time.
 
-
-
-
+***
 
 Inspired by the simplicity and focus of [jrnl](https://github.com/maebert/jrnl).
