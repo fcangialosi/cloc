@@ -2,6 +2,7 @@ import argparse
 import sys
 import os
 from datetime import datetime, timedelta, date
+from collections import defaultdict
 import json
 
 HOME = os.path.expanduser("~")
@@ -32,10 +33,11 @@ def str_to_date(string):
 
 def write(time, action, project, msg):
 	with open(DATA, 'a') as f:
-		f.write(time + " ")
-		f.write(action + " ")
-		f.write(project + " ")
-		f.write(msg)
+		f.write(time + "\t")
+		f.write(action + "\t")
+		f.write(project + "\t")
+		if msg:
+			f.write("\""+msg+"\"")
 		f.write("\n")
 
 def cloc_in(args,msg):
@@ -72,11 +74,11 @@ def cloc_out(args,msg):
 
 	datetime_in = datetime.strptime(time_in, "%Y-%m-%d %X")
 	time_elapsed = now - datetime_in
-	
+
 	print "You cloc'd out at " + str(now_str)
 	print "You worked for",
 	print delta_to_str(time_elapsed)
-	
+
 def total_range(range_start, range_end):
 
 	total = timedelta(microseconds=0)
@@ -102,54 +104,28 @@ def total_range(range_start, range_end):
 
 	return total
 
-def cloc_total(args):
-	if len(args) < 2:
-		when = 'today'
-	else:
-		when = args[1]
-
-	if when == 'today':
-		today = date.today()
-		today_start = datetime.combine(today, datetime.min.time())
-		today_end = datetime.combine(today, datetime.max.time())
-		total = total_range(today_start, today_end)
-
-	elif when == 'yesterday':
-		yesterday = date.today() - timedelta(days=1)
-		yesterday_start = datetime.combine(yesterday, datetime.min.time())
-		yesterday_end = datetime.combine(yesterday, datetime.max.time())
-		total = total_range(yesterday_start, yesterday_end)
-
-	elif when == 'week':
-		print 'TODO week'
-
-	elif when == 'month':
-		print 'TODO month'
-
-	elif when == 'year':
-		print 'TODO year'
-
-	else:
-		when = ' '.join(args[1:])
-		this_year = str(date.today().year)
-		if len(when.split('to')) <= 1:
-			start_day = end_day = datetime.strptime(when.strip() + " " + this_year, "%b %d %Y").date()
-		else:
-			start_day = datetime.strptime(when.split('to')[0].strip()+ " " + this_year , "%b %d %Y").date()
-			end_day = datetime.strptime(when.split('to')[1].strip() + " " + this_year, "%b %d %Y").date()
-
-		query_start = datetime.combine(start_day, datetime.min.time())
-		query_end = datetime.combine(end_day, datetime.max.time())
-		total = total_range(query_start, query_end)
-
-	print delta_to_str(total)
-
+def cloc_view(args):
+	print "==> timesheet for project {0} <==".format(args[1])
+	date_to_hrs = defaultdict(float)
+	with open(DATA, 'r') as f:
+		r = f.readlines()
+		periods = zip(*[iter(r)] * 2)
+		for period in periods:
+			in_date, in_time, _, in_project, in_msg = period[0].split("\t")
+			out_date, out_time, _, out_project, out_msg = period[1].split("\t")
+			period_start = str_to_date(in_date + " " + in_time)
+			period_end = str_to_date(out_date + " " + out_time)
+			assert(in_project == out_project)
+			if in_project == args[1]:
+				date_to_hrs[in_date] += (period_end-period_start).total_seconds() / 60.0
+	for date in sorted(date_to_hrs.keys()):
+		print date, date_to_hrs[date] / 60.0, "Hours"
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='cloc', description='cloc is tiny command line application to help you keep track of when you work.')
-	parser.add_argument('action', nargs="+", help="cloc in when you start working, then cloc out when youre done")
+	parser.add_argument('action', nargs="+", help="cloc in when you start working, then cloc out when youre done. cloc view to see how much you worked each day")
 	parser.add_argument('-m', '--message', help="Note to be stored along with this time entry",required=False, default=None)
-		
+
 	args = vars(parser.parse_args())
 
 	if not os.path.isfile(CONFIG):
@@ -162,7 +138,7 @@ if __name__ == "__main__":
 				DATA = HOME + user_file[1:]
 			else:
 				DATA = user_file
-		
+
 		if not os.path.isfile(DATA):
 			open(DATA, 'w').close()
 			print "\rCreated " + DATA + " (did not exist)"
@@ -187,8 +163,8 @@ if __name__ == "__main__":
 		cloc_in(args['action'],msg)
 	elif(args['action'][0] == 'out'):
 		cloc_out(args['action'],msg)
-	elif(args['action'][0] == 'total'):
-		cloc_total(args['action'])
+	elif(args['action'][0] == 'view'):
+		cloc_view(args['action'])
 	else:
 		print "Sorry, {0} is not a valid mode"
 		sys.exit(1)
