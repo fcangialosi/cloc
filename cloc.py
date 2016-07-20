@@ -33,7 +33,7 @@ def str_to_date(string):
 
 def write(time, action, project, msg):
 	with open(DATA, 'a') as f:
-		f.write(time + "\t")
+		f.write("\t".join(time.split(" ")) + "\t")
 		f.write(action + "\t")
 		f.write(project + "\t")
 		if msg:
@@ -106,7 +106,7 @@ def total_range(range_start, range_end):
 
 def cloc_view(args):
 	print "==> timesheet for project {0} <==".format(args[1])
-	date_to_hrs = defaultdict(float)
+	date_to_min = defaultdict(float)
 	with open(DATA, 'r') as f:
 		r = f.readlines()
 		periods = zip(*[iter(r)] * 2)
@@ -117,9 +117,9 @@ def cloc_view(args):
 			period_end = str_to_date(out_date + " " + out_time)
 			assert(in_project == out_project)
 			if in_project == args[1]:
-				date_to_hrs[in_date] += (period_end-period_start).total_seconds() / 60.0
-	for date in sorted(date_to_hrs.keys()):
-		print date, date_to_hrs[date] / 60.0, "Hours"
+				date_to_min[in_date] += (period_end-period_start).total_seconds() / 60.0
+	for date in sorted(date_to_min.keys()):
+		print date, "{:02d}:{:02d}".format(int(date_to_min[date]/60), int(round(date_to_min[date] % 60)))
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='cloc', description='cloc is tiny command line application to help you keep track of when you work.')
