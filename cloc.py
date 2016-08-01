@@ -104,7 +104,20 @@ def total_range(range_start, range_end):
 
 	return total
 
+def format_minutes(m):
+	return "{:02d}:{:02d}".format(int(m/60), int(round(m % 60)))
+
+def diff_mins(a,b):
+	return (b-a).total_seconds() / 60.0
+
+def to_dt(date,time):
+	return str_to_date(date + " " + time)
+
+
 def cloc_view(args):
+	if len(args) < 2:
+		sys.exit("usage: cloc view [project]")
+	print "==============================" + ("=" * len(args[1]))
 	print "==> timesheet for project {0} <==".format(args[1])
 	date_to_min = defaultdict(float)
 	with open(DATA, 'r') as f:
@@ -118,12 +131,26 @@ def cloc_view(args):
 			assert(in_project == out_project)
 			if in_project == args[1]:
 				date_to_min[in_date] += (period_end-period_start).total_seconds() / 60.0
+	total = 0
+	print "==============================" + ("=" * len(args[1]))
+	print "   |     date     |    t    |"
 	for date in sorted(date_to_min.keys()):
-		print date, "{:02d}:{:02d}".format(int(date_to_min[date]/60), int(round(date_to_min[date] % 60)))
+		print "   |  {}  |  {:02d}:{:02d}  |".format(date, int(date_to_min[date]/60), int(round(date_to_min[date] % 60)))
+		total+=date_to_min[date]
+	print "==============================" + ("=" * len(args[1]))
+	print "        total        {:02d}:{:02d}".format(int(total/60), int(round(total % 60)))
+
+def cloc_check():
+	with open(DATA, 'r') as f:
+		last = f.readlines()[-1]
+		in_date, in_time, _, in_project, in_msg = last.split("\t")
+		start = to_dt(in_date,in_time)
+		now = datetime.now()
+		print "You have been working for {} on {}".format(format_minutes(diff_mins(start,now)), in_project)
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='cloc', description='cloc is tiny command line application to help you keep track of when you work.')
-	parser.add_argument('action', nargs="+", help="cloc in when you start working, then cloc out when youre done. cloc view to see how much you worked each day")
+	parser.add_argument('action', nargs="+", help="cloc in when you start working, then cloc out when youre done. cloc check to see your current status, or cloc view to get a summary.")
 	parser.add_argument('-m', '--message', help="Note to be stored along with this time entry",required=False, default=None)
 
 	args = vars(parser.parse_args())
@@ -165,6 +192,8 @@ if __name__ == "__main__":
 		cloc_out(args['action'],msg)
 	elif(args['action'][0] == 'view'):
 		cloc_view(args['action'])
+	elif(args['action'][0] == 'check'):
+		cloc_check()
 	else:
 		print "Sorry, {0} is not a valid mode"
 		sys.exit(1)
