@@ -52,6 +52,21 @@ def cloc_in(args,msg):
 
 	print "You cloc'd in at " + str(now_str)
 
+def cloc_add(args,msg):
+    end = datetime.now()
+    start = end - timedelta(minutes=int(args[2]))
+    end_str = str(end).split(".")[0]
+    start_str = str(start).split(".")[0]
+
+    project = "None"
+    if len(args) > 1:
+            project = args[1]
+
+    write(start_str, 'in', project, msg)
+    write(end_str, 'out', project, msg)
+
+    print "You added a %s-minute work period" % args[2]
+
 def cloc_out(args,msg):
 	now = datetime.now()
 	now_str = str(now).split(".")[0]
@@ -124,10 +139,12 @@ def cloc_view(args):
 		r = f.readlines()
 		periods = zip(*[iter(r)] * 2)
 		for period in periods:
+                        print period
 			in_date, in_time, _, in_project, in_msg = period[0].split("\t")
 			out_date, out_time, _, out_project, out_msg = period[1].split("\t")
 			period_start = str_to_date(in_date + " " + in_time)
 			period_end = str_to_date(out_date + " " + out_time)
+                        print in_project,out_project
 			assert(in_project == out_project)
 			if in_project == args[1]:
 				date_to_min[in_date] += (period_end-period_start).total_seconds() / 60.0
@@ -194,6 +211,8 @@ if __name__ == "__main__":
 		cloc_view(args['action'])
 	elif(args['action'][0] == 'check'):
 		cloc_check()
+        elif(args['action'][0] == 'add'):
+                cloc_add(args['action'],msg)
 	else:
 		print "Sorry, {0} is not a valid mode"
 		sys.exit(1)
