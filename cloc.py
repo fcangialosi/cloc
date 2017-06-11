@@ -135,24 +135,28 @@ def cloc_view(args):
 	print "==============================" + ("=" * len(args[1]))
 	print "==> timesheet for project {0} <==".format(args[1])
 	date_to_min = defaultdict(float)
+        date_to_msg = {}
 	with open(DATA, 'r') as f:
 		r = f.readlines()
 		periods = zip(*[iter(r)] * 2)
 		for period in periods:
-                        print period
 			in_date, in_time, _, in_project, in_msg = period[0].split("\t")
 			out_date, out_time, _, out_project, out_msg = period[1].split("\t")
 			period_start = str_to_date(in_date + " " + in_time)
 			period_end = str_to_date(out_date + " " + out_time)
-                        print in_project,out_project
 			assert(in_project == out_project)
 			if in_project == args[1]:
 				date_to_min[in_date] += (period_end-period_start).total_seconds() / 60.0
+                                msg = in_msg.strip().replace("\"","")
+                                if in_date in date_to_msg:
+                                    date_to_msg[in_date] += ", " + msg
+                                else:
+                                    date_to_msg[in_date] = msg
 	total = 0
 	print "==============================" + ("=" * len(args[1]))
-	print "   |     date     |    t    |"
+	print "   |     date     |    t    |  "
 	for date in sorted(date_to_min.keys()):
-		print "   |  {}  |  {:02d}:{:02d}  |".format(date, int(date_to_min[date]/60), int(round(date_to_min[date] % 60)))
+		print "   |  {}  |  {:02d}:{:02d}  |   {}".format(date, int(date_to_min[date]/60), int(round(date_to_min[date] % 60)), date_to_msg[date])
 		total+=date_to_min[date]
 	print "==============================" + ("=" * len(args[1]))
 	print "        total        {:02d}:{:02d}".format(int(total/60), int(round(total % 60)))
