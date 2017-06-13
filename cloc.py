@@ -4,6 +4,8 @@ import os
 from datetime import datetime, timedelta, date
 from collections import defaultdict
 import json
+from terminaltables import SingleTable
+from math import ceil
 
 HOME = os.path.expanduser("~")
 DATA = HOME + '/cloc.txt'
@@ -31,7 +33,7 @@ def delta_to_str(delta):
 def str_to_date(string):
 	return datetime.strptime(string, "%Y-%m-%d %X")
 
-def write(time, action, project, msg):
+def write(time, action, project, msg=None):
 	with open(DATA, 'a') as f:
 		f.write("\t".join(time.split(" ")) + "\t")
 		f.write(action + "\t")
@@ -67,7 +69,7 @@ def cloc_add(args,msg):
 
     print "You added a %s-minute work period" % args[2]
 
-def cloc_out(args,msg):
+def cloc_out(args):
 	now = datetime.now()
 	now_str = str(now).split(".")[0]
 
@@ -85,7 +87,7 @@ def cloc_out(args,msg):
 			time_in = last_line[0] + " " + last_line[1]
 			project = last_line[3]
 
-	write(now_str, 'out', project, msg)
+	write(now_str, 'out', project)
 
 	datetime_in = datetime.strptime(time_in, "%Y-%m-%d %X")
 	time_elapsed = now - datetime_in
@@ -128,38 +130,100 @@ def diff_mins(a,b):
 def to_dt(date,time):
 	return str_to_date(date + " " + time)
 
+def round_mins_up(mins,min_time=15.0):
+    return (ceil(mins / min_time) * min_time) / 60.0
 
-def cloc_view(args):
-	if len(args) < 2:
-		sys.exit("usage: cloc view [project]")
-	print "==============================" + ("=" * len(args[1]))
-	print "==> timesheet for project {0} <==".format(args[1])
-	date_to_min = defaultdict(float)
-        date_to_msg = {}
-	with open(DATA, 'r') as f:
-		r = f.readlines()
-		periods = zip(*[iter(r)] * 2)
-		for period in periods:
-			in_date, in_time, _, in_project, in_msg = period[0].split("\t")
-			out_date, out_time, _, out_project, out_msg = period[1].split("\t")
-			period_start = str_to_date(in_date + " " + in_time)
-			period_end = str_to_date(out_date + " " + out_time)
-			assert(in_project == out_project)
-			if in_project == args[1]:
-				date_to_min[in_date] += (period_end-period_start).total_seconds() / 60.0
-                                msg = in_msg.strip().replace("\"","")
-                                if in_date in date_to_msg:
-                                    date_to_msg[in_date] += ", " + msg
-                                else:
-                                    date_to_msg[in_date] = msg
-	total = 0
-	print "==============================" + ("=" * len(args[1]))
-	print "   |     date     |    t    |  "
-	for date in sorted(date_to_min.keys()):
-		print "   |  {}  |  {:02d}:{:02d}  |   {}".format(date, int(date_to_min[date]/60), int(round(date_to_min[date] % 60)), date_to_msg[date])
-		total+=date_to_min[date]
-	print "==============================" + ("=" * len(args[1]))
-	print "        total        {:02d}:{:02d}".format(int(total/60), int(round(total % 60)))
+def cloc_view(project):
+    task_order = []
+    task_to_mins = defaultdict(float)
+    task_to_dates = defaultdict(set)
+    first_date = None
+    last_date = None
+    total = 0
+    f = open(DATA,'r')
+    r = f.readlines()
+    periods = zip(*[iter(r)] * 2)
+    for period in periods:
+        in_date, in_time, _, in_project, task = period[0].strip().split("\t")
+        out_date, out_time, _, out_project = period[1].strip().split("\t")
+        period_start = str_to_date(in_date + " " + in_time)
+        period_end = str_to_date(out_date + " " + out_time)
+        assert(in_project == out_project)
+
+        task = task.replace("\"","")
+
+        start_short = period_start.strftime('%-m/%-d')
+        end_short = period_end.strftime('%-m/%-d')
+        task_to_dates[task].add(start_short)
+        task_to_dates[task].add(end_short)
+        if not first_date:
+            first_date = start_short
+        last_date = end_short
+
+        # TODO round
+        time_spent = (period_end - period_start).total_seconds() / 60.0
+        task_to_mins[task] += time_spent
+        if not task in task_order:
+            task_order.append(task)
+        f.close()
+
+
+    i = 1
+    total = 0.0
+    table_data = [['#','Task','Dates','Hours','Rate','Earned']]
+    for task in task_order:
+        time_spent = round_mins_up(task_to_mins[task])
+        table_data.append([
+            str(i),
+            task,
+            ','.join(sorted(task_to_dates[task])),
+            '{:.2f}'.format(time_spent),
+            '$35',
+            '${:.2f}'.format(35 * time_spent)
+        ])
+        i += 1
+        total += time_spent
+
+    if len(periods)*2 < len(r):
+        in_date, in_time, _, in_project, task = r[-1].strip().split("\t")
+        period_start = str_to_date(in_date + " " + in_time)
+        period_end = datetime.now()
+        print period_start, period_end
+        task = task.replace("\"","")
+        start_short = period_start.strftime('%-m/%-d')
+        end_short = period_end.strftime('%-m/%-d')
+        if not first_date:
+            first_date = start_short
+        last_date = end_short
+
+        time_spent = round_mins_up((period_end - period_start).total_seconds() /
+                60.0)
+        total += time_spent
+
+        table_data.append([
+            str(i),
+            task,
+            'current',
+            '{:.2f}'.format(time_spent),
+            '$35',
+            '${:.2f}'.format(35 * time_spent)
+        ])
+
+    table_data.append([])
+
+    table_data.append([
+	'',
+	'Total',
+	'{} - {}'.format(first_date,last_date),
+    	'{:.2f}'.format(total),
+	'',
+	'${:.2f}'.format(35 * total)
+    ])
+
+    table_instance = SingleTable(table_data, project + " timesheet")
+    print
+    print(table_instance.table)
+    print
 
 def cloc_check():
 	with open(DATA, 'r') as f:
@@ -172,7 +236,7 @@ def cloc_check():
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(prog='cloc', description='cloc is tiny command line application to help you keep track of when you work.')
 	parser.add_argument('action', nargs="+", help="cloc in when you start working, then cloc out when youre done. cloc check to see your current status, or cloc view to get a summary.")
-	parser.add_argument('-m', '--message', help="Note to be stored along with this time entry",required=False, default=None)
+	parser.add_argument('-t', '--task', help="Note to be stored along with this time entry",required=False, default=None)
 
 	args = vars(parser.parse_args())
 
@@ -203,20 +267,23 @@ if __name__ == "__main__":
 		DATA = json.loads(r)['data']
 		config.close()
 
-	msg = "None"
-	if(args['message']):
-		msg = args['message']
+	task = "None"
+	if(args['task']):
+            task = args['task']
 
 	if(args['action'][0] == 'in'):
-		cloc_in(args['action'],msg)
+		cloc_in(args['action'],task)
 	elif(args['action'][0] == 'out'):
-		cloc_out(args['action'],msg)
+		cloc_out(args['action'])
 	elif(args['action'][0] == 'view'):
-		cloc_view(args['action'])
+            args = args['action']
+            if len(args) < 2:
+		sys.exit("usage: cloc view [project]")
+            cloc_view(args[1])
 	elif(args['action'][0] == 'check'):
 		cloc_check()
         elif(args['action'][0] == 'add'):
-                cloc_add(args['action'],msg)
+                cloc_add(args['action'],task)
 	else:
 		print "Sorry, {0} is not a valid mode"
 		sys.exit(1)
