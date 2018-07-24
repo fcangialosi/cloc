@@ -8,8 +8,13 @@ from terminaltables import SingleTable
 from math import ceil
 
 HOME = os.path.expanduser("~")
-DATA = HOME + '/cloc.txt'
+CLOC_HOME = HOME + '/.cloc/'
+DATA = CLOC_HOME + 'current.txt'
+PENDING = CLOC_HOME + 'pending.txt'
+PAID = CLOC_HOME + 'paid.txt'
 CONFIG = HOME + '/.cloc_config'
+tax_rate = None
+project_list = {}
 
 def delta_to_str(delta):
 	seconds_elapsed = int((delta.seconds % 3600) % 60)
@@ -40,6 +45,8 @@ def write(time, action, project, msg=None):
 		f.write(project + "\t")
 		if msg:
 			f.write("\""+msg+"\"")
+                else:
+                    f.write("0")
 		f.write("\n")
 
 def cloc_in(args,msg):
@@ -133,15 +140,11 @@ def to_dt(date,time):
 def round_mins_up(mins,min_time=15.0):
     return (ceil(mins / min_time) * min_time) / 60.0
 
-def cloc_view(project):
-    task_order = []
-    task_to_mins = defaultdict(float)
-    task_to_dates = defaultdict(set)
-    first_date = None
-    last_date = None
-    total = 0
-    f = open(DATA,'r')
+def total_time(filename, project):
+    f = open(filename,'r')
     r = f.readlines()
+
+    task_to_mins = defaultdict(float)
     periods = zip(*[iter(r)] * 2)
     for period in periods:
         in_date, in_time, _, in_project, task = period[0].strip().split("\t")
@@ -149,6 +152,45 @@ def cloc_view(project):
         period_start = str_to_date(in_date + " " + in_time)
         period_end = str_to_date(out_date + " " + out_time)
         assert(in_project == out_project)
+        if in_project != project:
+            continue
+        task = task.replace("\"","")
+        time_spent = (period_end - period_start).total_seconds() / 60.0
+        task_to_mins[task] += time_spent
+
+    f.close()
+
+    total = 0
+    for task in task_to_mins:
+        total += round_mins_up(task_to_mins[task])
+
+    return total
+
+
+def cloc_view(project):
+    task_order = []
+    task_to_mins = defaultdict(float)
+    task_to_dates = defaultdict(set)
+    task_to_upcharge = defaultdict(float)
+    first_date = None
+    last_date = None
+    total = 0
+
+    if not project in project_list:
+        sys.exit("error: project not listed in cloc config")
+    project_rate, project_goal = project_list[project]['rate'], project_list[project]['monthly_goal']
+
+    f = open(DATA,'r')
+    r = f.readlines()
+    periods = zip(*[iter(r)] * 2)
+    for period in periods:
+        in_date, in_time, _, in_project, task = period[0].strip().split("\t")
+        out_date, out_time, _, out_project, upcharge = period[1].strip().split("\t")
+        period_start = str_to_date(in_date + " " + in_time)
+        period_end = str_to_date(out_date + " " + out_time)
+        assert(in_project == out_project)
+        if in_project != project:
+            continue
 
         task = task.replace("\"","")
 
@@ -163,6 +205,7 @@ def cloc_view(project):
         # TODO round
         time_spent = (period_end - period_start).total_seconds() / 60.0
         task_to_mins[task] += time_spent
+        task_to_upcharge[task] += float(upcharge)
         if not task in task_order:
             task_order.append(task)
         f.close()
@@ -170,19 +213,20 @@ def cloc_view(project):
 
     i = 1
     total = 0.0
-    table_data = [['#','Task','Dates','Hours','Rate','Earned']]
+    table_data = [['#','Task','Dates','Hours (+up)', 'Rate', 'Earned']]
     for task in task_order:
         time_spent = round_mins_up(task_to_mins[task])
+        upcharge = task_to_upcharge[task]
         table_data.append([
             str(i),
             task,
             ','.join(sorted(task_to_dates[task])),
-            '{:.2f}'.format(time_spent),
-            '$35',
-            '${:.2f}'.format(35 * time_spent)
+            '{:.2f} (+{:.2f})'.format(time_spent, upcharge),
+            '${:.0f}'.format(project_rate),
+            '${:.2f}'.format(project_rate * (time_spent + upcharge))
         ])
         i += 1
-        total += time_spent
+        total += (time_spent + upcharge)
 
     if len(periods)*2 < len(r):
         in_date, in_time, _, in_project, task = r[-1].strip().split("\t")
@@ -205,10 +249,9 @@ def cloc_view(project):
             task,
             'current',
             '{:.2f}'.format(time_spent),
-            '$35',
-            '${:.2f}'.format(35 * time_spent)
+            '${:.2f}'.format(project_rate),
+            '${:.2f}'.format(project_rate * time_spent)
         ])
-
     table_data.append([])
 
     table_data.append([
@@ -217,13 +260,56 @@ def cloc_view(project):
 	'{} - {}'.format(first_date,last_date),
     	'{:.2f}'.format(total),
 	'',
-	'${:.2f}'.format(35 * total)
+	'${:.2f}'.format(project_rate * total)
+    ])
+
+    table_data.append([
+        '',
+        'Tax',
+        '',
+        '',
+        '{:.0f}%'.format(tax_rate * 100),
+        '${:.2f}'.format(project_rate * total * tax_rate)
+    ])
+    after_tax_total = project_rate * total * (1-tax_rate)
+    table_data.append([
+        '',
+        'Net',
+        '',
+        '',
+        '',
+        '${:.2f}'.format(after_tax_total)
+    ])
+    
+
+    table_data.append([])
+    table_data.append([
+        '',
+        'Goal',
+        '',
+        '{:.2f}'.format(project_goal / project_rate / (1-tax_rate)),
+        '',
+	'${:.2f}'.format(project_goal)
+    ])
+    remaining = project_goal - after_tax_total
+    table_data.append([
+        '',
+        'Remaining',
+        '',
+        '{:.2f}'.format(remaining / project_rate / (1-tax_rate)),
+        '',
+	'${:.2f}'.format(remaining)
     ])
 
     table_instance = SingleTable(table_data, project + " timesheet")
     print
     print(table_instance.table)
+    previously_paid = total_time(PAID,project) * 35.0
+    print "Previously paid: ${:.2f} (${:.2f} after tax)".format(previously_paid, previously_paid * 0.75)
+    pending = total_time(PENDING,project) * 35.0
+    print "Pending payment: ${:.2f} (${:.2f} after tax)".format(pending, pending * 0.75)
     print
+
 
 def cloc_check():
 	with open(DATA, 'r') as f:
@@ -263,8 +349,8 @@ if __name__ == "__main__":
 			config.write(json.dumps(settings))
 	else:
 		config = open(CONFIG, 'r')
-		r = config.read()
-		DATA = json.loads(r)['data']
+		r = json.loads(config.read())
+		DATA, project_list, tax_rate = r['data'], r['projects'], r['tax_rate']
 		config.close()
 
 	task = "None"
