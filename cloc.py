@@ -213,7 +213,7 @@ def cloc_view(project):
 
     i = 1
     total = 0.0
-    table_data = [['#','Task','Dates','Hours (+up)', 'Rate', 'Earned']]
+    table_data = [['#','Task','Dates','Hours (+up)', 'Rate (eff)', 'Earned']]
     for task in task_order:
         time_spent = round_mins_up(task_to_mins[task])
         upcharge = task_to_upcharge[task]
@@ -222,7 +222,7 @@ def cloc_view(project):
             task,
             ','.join(sorted(task_to_dates[task])),
             '{:.2f} (+{:.2f})'.format(time_spent, upcharge),
-            '${:.0f}'.format(project_rate),
+            '${:.0f} (${:.0f})'.format(project_rate, ((upcharge+time_spent)/time_spent) * project_rate ),
             '${:.2f}'.format(project_rate * (time_spent + upcharge))
         ])
         i += 1

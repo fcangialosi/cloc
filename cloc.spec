@@ -4,9 +4,9 @@ block_cipher = None
 
 
 a = Analysis(['cloc.py'],
-             pathex=['/Users/frank/dev/side/cloc'],
-             binaries=None,
-             datas=None,
+             pathex=['/Users/frank/dev/cloc'],
+             binaries=[],
+             datas=[],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],
