@@ -148,7 +148,8 @@ def total_time(filename, project):
     periods = zip(*[iter(r)] * 2)
     for period in periods:
         in_date, in_time, _, in_project, task = period[0].strip().split("\t")
-        out_date, out_time, _, out_project = period[1].strip().split("\t")
+        out_date, out_time, _, out_project, extra = period[1].strip().split("\t")
+        extra_mins = float(extra) * 60.0
         period_start = str_to_date(in_date + " " + in_time)
         period_end = str_to_date(out_date + " " + out_time)
         assert(in_project == out_project)
@@ -156,7 +157,7 @@ def total_time(filename, project):
             continue
         task = task.replace("\"","")
         time_spent = (period_end - period_start).total_seconds() / 60.0
-        task_to_mins[task] += time_spent
+        task_to_mins[task] += (time_spent + extra_mins)
 
     f.close()
 
