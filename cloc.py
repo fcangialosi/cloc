@@ -176,6 +176,7 @@ def cloc_view(project):
     first_date = None
     last_date = None
     total = 0
+    tax_rate = project_list[project]['tax_rate']
 
     if not project in project_list:
         sys.exit("error: project not listed in cloc config")
@@ -282,25 +283,25 @@ def cloc_view(project):
         '${:.2f}'.format(after_tax_total)
     ])
     
-
-    table_data.append([])
-    table_data.append([
-        '',
-        'Goal',
-        '',
-        '{:.2f}'.format(project_goal / project_rate / (1-tax_rate)),
-        '',
-	'${:.2f}'.format(project_goal)
-    ])
-    remaining = project_goal - after_tax_total
-    table_data.append([
-        '',
-        'Remaining',
-        '',
-        '{:.2f}'.format(remaining / project_rate / (1-tax_rate)),
-        '',
-	'${:.2f}'.format(remaining)
-    ])
+    if project_goal > 0:
+        table_data.append([])
+        table_data.append([
+            '',
+            'Goal',
+            '',
+            '{:.2f}'.format(project_goal / project_rate / (1-tax_rate)),
+            '',
+            '${:.2f}'.format(project_goal)
+        ])
+        remaining = project_goal - after_tax_total
+        table_data.append([
+            '',
+            'Remaining',
+            '',
+            '{:.2f}'.format(remaining / project_rate / (1-tax_rate)),
+            '',
+            '${:.2f}'.format(remaining)
+        ])
 
     table_instance = SingleTable(table_data, project + " timesheet")
     print
@@ -351,7 +352,7 @@ if __name__ == "__main__":
 	else:
 		config = open(CONFIG, 'r')
 		r = json.loads(config.read())
-		DATA, project_list, tax_rate = r['data'], r['projects'], r['tax_rate']
+		DATA, project_list = r['data'], r['projects'] 
 		config.close()
 
 	task = "None"
