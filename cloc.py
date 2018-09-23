@@ -140,7 +140,7 @@ def to_dt(date,time):
 def round_mins_up(mins,min_time=15.0):
     return (ceil(mins / min_time) * min_time) / 60.0
 
-def total_time(filename, project):
+def total_time(filename, project, min_increments):
     f = open(filename,'r')
     r = f.readlines()
 
@@ -163,7 +163,7 @@ def total_time(filename, project):
 
     total = 0
     for task in task_to_mins:
-        total += round_mins_up(task_to_mins[task])
+        total += round_mins_up(task_to_mins[task], min_increments)
 
     return total
 
@@ -177,6 +177,7 @@ def cloc_view(project):
     last_date = None
     total = 0
     tax_rate = project_list[project]['tax_rate']
+    min_increments = project_list[project]['min_increments']
 
     if not project in project_list:
         sys.exit("error: project not listed in cloc config")
@@ -217,7 +218,7 @@ def cloc_view(project):
     total = 0.0
     table_data = [['#','Task','Dates','Hours (+up)', 'Rate (eff)', 'Earned']]
     for task in task_order:
-        time_spent = round_mins_up(task_to_mins[task])
+        time_spent = round_mins_up(task_to_mins[task], min_increments)
         upcharge = task_to_upcharge[task]
         table_data.append([
             str(i),
@@ -242,8 +243,10 @@ def cloc_view(project):
             first_date = start_short
         last_date = end_short
 
-        time_spent = round_mins_up((period_end - period_start).total_seconds() /
-                60.0)
+        time_spent = round_mins_up(
+            ((period_end - period_start).total_seconds() / 60.0),
+            min_increments
+        )
         total += time_spent
 
         table_data.append([
@@ -306,9 +309,9 @@ def cloc_view(project):
     table_instance = SingleTable(table_data, project + " timesheet")
     print
     print(table_instance.table)
-    previously_paid = total_time(PAID,project) * 35.0
+    previously_paid = total_time(PAID,project,min_increments) * 35.0
     print "Previously paid: ${:.2f} (${:.2f} after tax)".format(previously_paid, previously_paid * 0.75)
-    pending = total_time(PENDING,project) * 35.0
+    pending = total_time(PENDING,project,min_increments) * 35.0
     print "Pending payment: ${:.2f} (${:.2f} after tax)".format(pending, pending * 0.75)
     print
 
