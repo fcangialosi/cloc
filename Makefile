@@ -1,2 +1,2 @@
-all: cloc.py
-	pyinstaller --onefile cloc.py && mv dist/cloc ./ && rm -rf dist/ build/ && mv cloc /usr/local/bin/
+all: cloc
+	sudo chmod +x cloc && sudo cp cloc /usr/local/bin

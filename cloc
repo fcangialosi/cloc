@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import argparse
 import sys
 import os
@@ -8,13 +10,13 @@ from terminaltables import SingleTable
 from math import ceil
 
 HOME = os.path.expanduser("~")
-CLOC_HOME = HOME + '/.cloc/'
-DATA = CLOC_HOME + 'current.txt'
-PENDING = CLOC_HOME + 'pending.txt'
-PAID = CLOC_HOME + 'paid.txt'
 CONFIG = HOME + '/.cloc_config'
 tax_rate = None
 project_list = {}
+CLOC_HOME = None
+CURRENT = None
+PENDING = None
+PAID = None
 
 def delta_to_str(delta):
 	seconds_elapsed = int((delta.seconds % 3600) % 60)
@@ -39,7 +41,8 @@ def str_to_date(string):
 	return datetime.strptime(string, "%Y-%m-%d %X")
 
 def write(time, action, project, msg=None):
-	with open(DATA, 'a') as f:
+        print(CURRENT)
+	with open(CURRENT, 'a') as f:
 		f.write("\t".join(time.split(" ")) + "\t")
 		f.write(action + "\t")
 		f.write(project + "\t")
@@ -81,7 +84,7 @@ def cloc_out(args):
 	now_str = str(now).split(".")[0]
 
 	project = "None"
-	with open(DATA, 'r') as f:
+	with open(CURRENT, 'r') as f:
 		r = f.readlines()
 		if len(r) < 1:
 			print "Whoa there, you haven't even cloc'd in yet!"
@@ -107,7 +110,7 @@ def total_range(range_start, range_end):
 
 	total = timedelta(microseconds=0)
 
-	with open(DATA, 'r') as f:
+	with open(CURRENT, 'r') as f:
 
 		r = f.readlines()
 		periods = zip(*[iter(r)] * 2)
@@ -183,7 +186,7 @@ def cloc_view(project):
         sys.exit("error: project not listed in cloc config")
     project_rate, project_goal = project_list[project]['rate'], project_list[project]['monthly_goal']
 
-    f = open(DATA,'r')
+    f = open(CURRENT,'r')
     r = f.readlines()
     periods = zip(*[iter(r)] * 2)
     for period in periods:
@@ -317,7 +320,7 @@ def cloc_view(project):
 
 
 def cloc_check():
-	with open(DATA, 'r') as f:
+	with open(CURRENT, 'r') as f:
 		last = f.readlines()[-1]
 		in_date, in_time, _, in_project, in_msg = last.split("\t")
 		start = to_dt(in_date,in_time)
@@ -338,25 +341,30 @@ if __name__ == "__main__":
 
 		if(len(user_file) > 1):
 			if(user_file[0] == '~'):
-				DATA = HOME + user_file[1:]
+				CURRENT = HOME + user_file[1:]
 			else:
-				DATA = user_file
+				CURRENT = user_file
 
-		if not os.path.isfile(DATA):
-			open(DATA, 'w').close()
-			print "\rCreated " + DATA + " (did not exist)"
+		if not os.path.isfile(CURRENT):
+			open(CURRENT, 'w').close()
+			print "\rCreated " + CURRENT + " (did not exist)"
 		else:
-			print "\rUsing " + DATA + " (already exists)"
+			print "\rUsing " + CURRENT + " (already exists)"
 
 		with open(CONFIG, 'w') as config:
 			settings = {}
-			settings['data'] = DATA
+			settings['root'] = CURRENT
 			config.write(json.dumps(settings))
 	else:
 		config = open(CONFIG, 'r')
 		r = json.loads(config.read())
-		DATA, project_list = r['data'], r['projects'] 
+		root, project_list = r['root'], r['projects'] 
+                ROOT = os.path.expanduser(root)
 		config.close()
+        CLOC_HOME = os.path.join(ROOT, '.cloc')
+        CURRENT = os.path.join(CLOC_HOME, 'current.txt')
+        PENDING = os.path.join(CLOC_HOME, 'pending.txt')
+        PAID = os.path.join(CLOC_HOME, 'paid.txt')
 
 	task = "None"
 	if(args['task']):
