@@ -12,7 +12,7 @@ from math import ceil
 HOME = os.path.expanduser("~")
 CONFIG = HOME + '/.cloc_config'
 tax_rate = None
-project_list = {}
+PROJECT_LIST = {}
 CLOC_HOME = None
 CURRENT = None
 PENDING = None
@@ -179,12 +179,12 @@ def cloc_view(project):
     first_date = None
     last_date = None
     total = 0
-    tax_rate = project_list[project]['tax_rate']
-    min_increments = project_list[project]['min_increments']
+    tax_rate = PROJECT_LIST[project]['tax_rate']
+    min_increments = PROJECT_LIST[project]['min_increments']
 
-    if not project in project_list:
+    if not project in PROJECT_LIST:
         sys.exit("error: project not listed in cloc config")
-    project_rate, project_goal = project_list[project]['rate'], project_list[project]['monthly_goal']
+    project_rate, project_goal = PROJECT_LIST[project]['rate'], PROJECT_LIST[project]['monthly_goal']
 
     f = open(CURRENT,'r')
     r = f.readlines()
@@ -358,13 +358,17 @@ if __name__ == "__main__":
 	else:
 		config = open(CONFIG, 'r')
 		r = json.loads(config.read())
-		root, project_list = r['root'], r['projects'] 
+		root = r['root']
                 ROOT = os.path.expanduser(root)
 		config.close()
         CLOC_HOME = os.path.join(ROOT, '.cloc')
+        PROJECTS = os.path.join(CLOC_HOME, 'projects.json')
         CURRENT = os.path.join(CLOC_HOME, 'current.txt')
         PENDING = os.path.join(CLOC_HOME, 'pending.txt')
         PAID = os.path.join(CLOC_HOME, 'paid.txt')
+
+        with open(PROJECTS, 'r') as f:
+            PROJECT_LIST = json.loads(f.read())
 
 	task = "None"
 	if(args['task']):
