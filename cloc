@@ -41,7 +41,6 @@ def str_to_date(string):
 	return datetime.strptime(string, "%Y-%m-%d %X")
 
 def write(time, action, project, msg=None):
-        print(CURRENT)
 	with open(CURRENT, 'a') as f:
 		f.write("\t".join(time.split(" ")) + "\t")
 		f.write(action + "\t")
@@ -312,9 +311,9 @@ def cloc_view(project):
     table_instance = SingleTable(table_data, project + " timesheet")
     print
     print(table_instance.table)
-    previously_paid = total_time(PAID,project,min_increments) * 35.0
+    previously_paid = total_time(PAID,project,min_increments) * project_rate
     print "Previously paid: ${:.2f} (${:.2f} after tax)".format(previously_paid, previously_paid * 0.75)
-    pending = total_time(PENDING,project,min_increments) * 35.0
+    pending = total_time(PENDING,project,min_increments) * project_rate
     print "Pending payment: ${:.2f} (${:.2f} after tax)".format(pending, pending * 0.75)
     print
 
